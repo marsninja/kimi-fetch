@@ -1,0 +1,57 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+env:
+  JACLANG_REPO: https://github.com/jaseci-labs/jaseci.git
+  JACLANG_REF: cfae4422eb0cf73d6aa066210c78c5050e320777
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            target: linux-x86_64
+          - os: macos-latest
+            target: macos-arm64
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install jac
+        run: |
+          curl -fsSL https://raw.githubusercontent.com/jaseci-labs/jaseci/main/scripts/install.sh | bash
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
+      - name: Wire the pinned dev compiler source
+        run: |
+          git init -q "$RUNNER_TEMP/jaseci"
+          git -C "$RUNNER_TEMP/jaseci" remote add origin "$JACLANG_REPO"
+          git -C "$RUNNER_TEMP/jaseci" fetch -q --depth 1 origin "$JACLANG_REF"
+          git -C "$RUNNER_TEMP/jaseci" checkout -q FETCH_HEAD
+          printf '\n[dev]\njaclang_source = "%s/jaseci/jac"\n' "$RUNNER_TEMP" >> jac.toml
+          jac --version
+          jac --version 2>&1 | grep -q "dev mode"
+
+      - name: Type-check and ownership-check
+        run: jac check .
+
+      - name: Tests
+        run: jac test main.na.jac
+
+      - name: Native build (zero-RC proof)
+        run: jac nacompile main.na.jac --scrub --gc none --enforce-nogc --assert-no-rc -o kimi-fetch
+
+      - name: Offline smoke
+        run: |
+          ./kimi-fetch --help
+          mkdir -p smoke/K3/.kimi-fetch
+          cp tests/fixture_manifest.json smoke/K3/.kimi-fetch/manifest.json
+          ./kimi-fetch smoke/K3 --status | tee status.out
+          grep -q "0 done, 2 pending (300 bytes) of 2 files" status.out
