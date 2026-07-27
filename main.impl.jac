@@ -1,25 +1,4 @@
-"""Streaming scanner for the Hugging Face tree-API manifest JSON.
-
-The manifest is one JSON array of tree entries. Building a list of parsed
-entries is off the table under the zero-RC contract (append of heap elements
-is E1406), so the scanner is a cursor: `next_entry(&src, pos)` parses the
-next object and returns it together with the position to resume from.
-"""
-
-glob ENTRY_END: int = 0;
-glob ENTRY_FILE: int = 1;
-glob ENTRY_SKIP: int = 2;
-glob ENTRY_BAD: int = 3;
-
-obj FileEntry {
-    has kind: int;
-    has path: own str;
-    has size: int;
-    has sha256: own str;
-    has next_pos: int;
-}
-
-def obj_close(src: &str, brace: int, limit: int) -> int {
+impl obj_close(src: &str, brace: int, limit: int) -> int {
     depth = 0;
     i = brace;
     in_str = False;
@@ -48,7 +27,7 @@ def obj_close(src: &str, brace: int, limit: int) -> int {
     return -1;
 }
 
-def str_field(src: &str, key: &str, start: int, end: int) -> own str {
+impl str_field(src: &str, key: &str, start: int, end: int) -> own str {
     k = src.find(key, start);
     if k < 0 or k >= end {
         return "";
@@ -80,7 +59,7 @@ def str_field(src: &str, key: &str, start: int, end: int) -> own str {
     return out;
 }
 
-def int_field(src: &str, key: &str, start: int, end: int) -> int {
+impl int_field(src: &str, key: &str, start: int, end: int) -> int {
     k = src.find(key, start);
     if k < 0 or k >= end {
         return -1;
@@ -107,7 +86,7 @@ def int_field(src: &str, key: &str, start: int, end: int) -> int {
     return n;
 }
 
-def strip_sha_prefix(s: &str) -> own str {
+impl strip_sha_prefix(s: &str) -> own str {
     if s.startswith("sha256:") {
         tail: own str = s[7:];
         return tail;
@@ -116,7 +95,7 @@ def strip_sha_prefix(s: &str) -> own str {
     return copy;
 }
 
-def lfs_sha(src: &str, start: int, end: int) -> own str {
+impl lfs_sha(src: &str, start: int, end: int) -> own str {
     k = src.find("\"lfs\":", start);
     if k < 0 or k >= end {
         return "";
@@ -126,7 +105,7 @@ def lfs_sha(src: &str, start: int, end: int) -> own str {
     return clean;
 }
 
-def path_ok(p: &str) -> bool {
+impl path_ok(p: &str) -> bool {
     if len(p) == 0 {
         return False;
     }
@@ -148,7 +127,7 @@ def path_ok(p: &str) -> bool {
     return True;
 }
 
-def next_entry(src: &str, pos: int) -> own FileEntry {
+impl next_entry(src: &str, pos: int) -> own FileEntry {
     limit = len(src);
     start = src.find("{", pos);
     if start < 0 {
@@ -169,4 +148,47 @@ def next_entry(src: &str, pos: int) -> own FileEntry {
     }
     sha: own str = lfs_sha(src, start, end);
     return FileEntry(kind=ENTRY_FILE, path=p, size=sz, sha256=sha, next_pos=end);
+}
+
+impl read_file(path: &str) -> own str {
+    with open(f"{path}") as f {
+        body: own str = f.read();
+        return body;
+    }
+    return "";
+}
+
+impl run() -> int {
+    if len(sys.argv) < 2 {
+        print("usage: kimi-fetch <manifest.json>");
+        return 1;
+    }
+    src: own str = read_file(&sys.argv[1]);
+    pos = 0;
+    files = 0;
+    dirs = 0;
+    total_bytes = 0;
+    lfs = 0;
+    while True {
+        e = next_entry(&src, pos);
+        if e.kind == ENTRY_END {
+            break;
+        }
+        if e.kind == ENTRY_BAD {
+            print(f"bad entry at {pos}");
+            return 1;
+        }
+        if e.kind == ENTRY_FILE {
+            files += 1;
+            total_bytes += e.size;
+            if e.sha256 != "" {
+                lfs += 1;
+            }
+        } else {
+            dirs += 1;
+        }
+        pos = e.next_pos;
+    }
+    print(f"files={files} lfs={lfs} dirs={dirs} bytes={total_bytes}");
+    return 0;
 }

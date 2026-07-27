@@ -94,6 +94,28 @@ which is not layout-compatible`. The ownership contract *requires* the
 annotation (dropping it is E1401), so enforced modules cannot avoid this
 warning on any obj carrying a string. One of the two diagnostics has to give.
 
+### 9. Imported modules always nacompile under gc=cycles — the zero-RC contract is single-module only
+
+With `main.na.jac` importing `manifest.na.jac`, and *all three* of
+`--gc none`, `jac.toml [gc] default = "none"`, and
+`[gc.enforce] modules = ["*"]` in effect, a scrubbed build reports:
+
+```
+rc-stats [main.na.jac]     gc=none   coverage=100.0% rc-free
+rc-stats [manifest.na.jac] gc=cycles coverage=18.4%
+```
+
+and `--assert-no-rc` fails with a full page of `__rc_*` symbols. The E140x
+*checks* do reach the imported module (jac check flags it as enforced by the
+`"*"` pattern), but the emitted code still refcounts — so ownership
+annotations are policed and then ignored at codegen. The dep-import path in
+`na_compile_pass.impl.jac` builds the child `CompileOptions` from
+`self.prog?._compile_options` with a silent `"cycles"` fallback, which is
+what appears to be losing the mode. Until this is fixed a zero-RC program
+must be a single module; this project collapsed to `main.na.jac` +
+`main.impl.jac` (annexes share the module, so decl/impl separation still
+works) and got `assert-no-rc ok`.
+
 ## Guide gaps (jac guide / SKILL.md)
 
 - `jac-native-memory` shows single-file toys only. It never shows the shape a
