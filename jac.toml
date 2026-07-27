@@ -14,8 +14,9 @@ default = "none"
 [gc.enforce]
 modules = ["*"]
 
-# W6002 calls str.find "JS-idiomatic", but find is part of the documented
-# native str subset and the suggested alternative (generators) does not exist
-# on the native path — see DOGFOOD.md.
+# W6002's JS-slop table matches by method name only, and `find` is the one
+# Python/JS homonym in it, so every str.find here warned. Fixed upstream
+# (jaseci fix/w6002-str-find-false-positive); drop this ignore once CI's
+# pinned jac release contains the fix — see DOGFOOD.md issue 7.
 [check.lint]
 ignore = ["W6002"]

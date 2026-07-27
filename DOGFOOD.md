@@ -87,6 +87,23 @@ listed *unsupported* feature on the native path — the lint's suggested fix is
 a compile error in the codespace it fires in. Silenced project-wide via
 `[check.lint] ignore = ["W6002"]`.
 
+**Root cause (traced + fixed upstream).** This is not a native/Python parity
+break — runtime parity is intact. W6002 comes from `PortabilityWarnPass`, a
+JS-slop detector whose `JS_METHODS` table (`push`, `forEach`, `charAt`, ...)
+is matched by method *name* alone, with no receiver or argument test. `find`
+is the one entry in that table that is simultaneously a JS Array method
+(takes a callback) and a legitimate Python str method (takes a substring) —
+the single Python/JS homonym, and this tool happened to be built almost
+entirely out of it. Fixed in jaseci branch
+`fix/w6002-str-find-false-positive` (commit `2f08b7f9c`): `find` now warns
+only when the call is JS-shaped — exactly one argument that is a lambda or a
+name resolving to a function symbol — so `s.find("x")`, `s.find(pat)`, and
+`s.find(pat, 2)` are clean while `items.find(callback)` still warns. The
+`ignore` below stays until CI's pinned release ships the fix. The same
+name-only matching can also hit user-defined methods that share a table name
+(any object with a `.parse()` or `.assign()` method), which deserves its own
+look upstream.
+
 ### 8. W5032 "not layout-compatible" fires on `own str` obj fields
 
 `has path: own str;` on a plain obj warns `W5032: field has type 'own str'
