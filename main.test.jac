@@ -67,3 +67,66 @@ test "missing size is rejected" {
     e = next_entry(&m, 0);
     assert e.kind == ENTRY_BAD;
 }
+
+test "parent_dir splits at last slash" {
+    a: own str = "assets/deep/logo.png";
+    d: own str = parent_dir(&a);
+    assert d == "assets/deep";
+    b: own str = "top.txt";
+    d2: own str = parent_dir(&b);
+    assert d2 == "";
+}
+
+test "int parsing helpers" {
+    w: own str = "   12345\n";
+    assert parse_leading_int(&w) == 12345;
+    n1: own str = "42";
+    assert to_int(&n1) == 42;
+    n2: own str = "4x";
+    assert to_int(&n2) == -1;
+    n3: own str = "";
+    assert to_int(&n3) == -1;
+}
+
+test "qp shell-quotes one value" {
+    s: own str = "a b";
+    q: own str = qp(&s);
+    assert q == "'a b'";
+}
+
+test "first_hex_token stops at first non-hex" {
+    o: own str = "975584c00f85  model.safetensors\n";
+    t: own str = first_hex_token(&o);
+    assert t == "975584c00f85";
+}
+
+test "path whitelist rejects shell metacharacters" {
+    ok1: own str = "model-00001-of-000096.safetensors";
+    assert path_ok(&ok1);
+    ok2: own str = "assets/kimi-logo.png";
+    assert path_ok(&ok2);
+    bad1: own str = "a b";
+    assert not path_ok(&bad1);
+    bad2: own str = "a$(reboot)/x";
+    assert not path_ok(&bad2);
+    bad3: own str = "a`b";
+    assert not path_ok(&bad3);
+}
+
+test "resolve url composes" {
+    r: own str = "config.json";
+    u: own str = repo_resolve_url(&r);
+    assert u == "https://huggingface.co/moonshotai/Kimi-K3/resolve/main/config.json";
+}
+
+test "file_size and sha256_file agree with the shell" {
+    _ = sh("mkdir -p /tmp/kimi_fetch_test");
+    p: own str = "/tmp/kimi_fetch_test/x.txt";
+    with open(f"{p}", "w") as f {
+        f.write("abc");
+    }
+    t: own str = "/tmp/kimi_fetch_test/probe.tmp";
+    assert file_size(&p, &t) == 3;
+    h: own str = sha256_file(&p, &t);
+    assert h == "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad";
+}

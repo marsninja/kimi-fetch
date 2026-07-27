@@ -116,6 +116,25 @@ must be a single module; this project collapsed to `main.na.jac` +
 `main.impl.jac` (annexes share the module, so decl/impl separation still
 works) and got `assert-no-rc ok`.
 
+### 10. Native f-strings drop single-quote characters between two interpolations
+
+Minimal repro (native, any gc mode):
+
+```jac
+a: own str = "AA";
+b: own str = "BB";
+print(f"'{a}' '{b}'");     # prints  'AA BB'   — should be  'AA' 'BB'
+print(f"\"{a}\" \"{b}\""); # prints  "AA" "BB" — correct
+print(f"x '{a}' y");       # correct — single interpolation is fine
+```
+
+The literal segment *between* two placeholders loses its single-quote
+characters (double quotes survive). For a program that builds shell commands
+this is catastrophic and silent: `curl ... -o '{part}' '{url}'` fuses both
+arguments into one quoted blob and curl reports "no URL specified". This
+tool now assembles every command by concatenating single-interpolation
+pieces through a `qp()` quote helper.
+
 ## Guide gaps (jac guide / SKILL.md)
 
 - `jac-native-memory` shows single-file toys only. It never shows the shape a
@@ -128,6 +147,11 @@ works) and got `assert-no-rc ok`.
   a file's size natively* — deserves an explicit callout plus the `wc -c`
   workaround, since the promise that unsupported members fail loudly does not
   hold for `os.path` members (see issue 1).
+- `include` is a reserved word (`include: own str = "";` is a parse error
+  with an unhelpful `Missing ';'` cascade), but it is absent from
+  `jac-core-cheatsheet`'s reserved-keyword list, which names `node`, `edge`,
+  `visit`, etc. A downloader naturally wants a variable called `include`;
+  the cheatsheet list should be the complete one.
 - Nothing documents that `os.system` returns the raw POSIX wait status
   (exit code × 256) on the native path. Python-congruent, yes, but the guide's
   stdlib table is exactly where a one-liner would prevent the classic
