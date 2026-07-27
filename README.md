@@ -16,6 +16,22 @@ collector and no reference counting** — every allocation has a statically
 determined free point, proven at build time by
 `--gc none --enforce-nogc --assert-no-rc`.
 
+## Install
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/marsninja/kimi-fetch/main/install.sh | bash
+```
+
+Grabs the latest release binary for your platform (Linux x86_64 or macOS
+arm64), verifies its sha256, and installs it to `~/.local/bin/kimi-fetch` —
+no API token, no dependencies beyond `curl` and `tar`. Pin a version or
+change the destination:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/marsninja/kimi-fetch/main/install.sh \
+  | bash -s -- --version v0.1.0 --to /usr/local/bin
+```
+
 ## Usage
 
 ```bash

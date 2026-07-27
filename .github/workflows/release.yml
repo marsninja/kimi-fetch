@@ -53,10 +53,14 @@ jobs:
         run: |
           TAG="${GITHUB_REF_NAME}"
           PKG="kimi-fetch-${TAG}-${{ matrix.target }}"
+          ALIAS="kimi-fetch-${{ matrix.target }}"
           mkdir "$PKG"
           cp kimi-fetch LICENSE README.md "$PKG/"
           tar -czf "$PKG.tar.gz" "$PKG"
-          shasum -a 256 "$PKG.tar.gz" > "$PKG.tar.gz.sha256" 2>/dev/null || sha256sum "$PKG.tar.gz" > "$PKG.tar.gz.sha256"
+          cp "$PKG.tar.gz" "$ALIAS.tar.gz"
+          if command -v shasum >/dev/null; then SHA="shasum -a 256"; else SHA="sha256sum"; fi
+          $SHA "$PKG.tar.gz" > "$PKG.tar.gz.sha256"
+          $SHA "$ALIAS.tar.gz" > "$ALIAS.tar.gz.sha256"
 
       - name: Upload to the release
         env:
@@ -66,4 +70,6 @@ jobs:
           gh release create "$TAG" --repo "$GITHUB_REPOSITORY" --title "$TAG" --generate-notes 2>/dev/null || true
           gh release upload "$TAG" --repo "$GITHUB_REPOSITORY" --clobber \
             "kimi-fetch-${TAG}-${{ matrix.target }}.tar.gz" \
-            "kimi-fetch-${TAG}-${{ matrix.target }}.tar.gz.sha256"
+            "kimi-fetch-${TAG}-${{ matrix.target }}.tar.gz.sha256" \
+            "kimi-fetch-${{ matrix.target }}.tar.gz" \
+            "kimi-fetch-${{ matrix.target }}.tar.gz.sha256"
