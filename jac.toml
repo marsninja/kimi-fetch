@@ -13,3 +13,9 @@ default = "none"
 
 [gc.enforce]
 modules = ["*"]
+
+# W6002 calls str.find "JS-idiomatic", but find is part of the documented
+# native str subset and the suggested alternative (generators) does not exist
+# on the native path — see DOGFOOD.md.
+[check.lint]
+ignore = ["W6002"]

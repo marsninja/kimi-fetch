@@ -70,6 +70,30 @@ from a fresh RHS — a slice **is** a fresh string. Annotating
 `p: own str = src[a:b];` fixes it. Either the inference should cover this or
 the guide should call it out.
 
+### 6. Typed-base enum members are E1401 "heap-typed locals" under nogc enforcement
+
+`enum EntryKind: int { END = 0, FILE = 1 }` — each member is reported as a
+heap-typed local with no ownership state, with a help text about annotating
+contract positions that cannot apply to an enum declaration. Int-base enums
+are therefore unusable in enforced modules; this tool fell back to
+`glob ENTRY_END: int = 0;` constants. The native guide advertises typed-base
+enums as a supported feature, so the two features contradict each other.
+
+### 7. W6002 lints `str.find` as "JS-idiomatic" — but it's the documented native idiom
+
+Every `src.find(needle, start)` draws `W6002: use 'next() with generator'`.
+`find` is in `jac-native`'s supported str-method table, and generators are a
+listed *unsupported* feature on the native path — the lint's suggested fix is
+a compile error in the codespace it fires in. Silenced project-wide via
+`[check.lint] ignore = ["W6002"]`.
+
+### 8. W5032 "not layout-compatible" fires on `own str` obj fields
+
+`has path: own str;` on a plain obj warns `W5032: field has type 'own str'
+which is not layout-compatible`. The ownership contract *requires* the
+annotation (dropping it is E1401), so enforced modules cannot avoid this
+warning on any obj carrying a string. One of the two diagnostics has to give.
+
 ## Guide gaps (jac guide / SKILL.md)
 
 - `jac-native-memory` shows single-file toys only. It never shows the shape a
