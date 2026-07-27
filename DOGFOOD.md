@@ -152,6 +152,40 @@ reported "pending" for files with partials on disk. Switched everything to
 shims aren't covered by the fail-loudly guarantee, and two of the four
 "supported" members are broken.
 
+### 12. The `[dev] jaclang_source` loop is broken in release binaries: ownership pass scheduling error
+
+Installing a release binary (0.34.7) and pointing `[dev] jaclang_source` at a
+source checkout — even the exact `v0.34.7` tag, so binary and source match —
+fails every `jac check` and `jac nacompile` with:
+
+```
+scheduling error: pass OwnershipCheckPass requires analysis 'inference'
+which has not run for module ... -- the schedule that reached this point
+is missing a declared dependency.
+```
+
+Cold or warm cache makes no difference. The dev loop evidently only works
+with a zig-linked dev binary (`zig build -Ddev`), which means CI cannot pin
+a compiler *source* SHA the way this project wanted to: this repo's CI had
+to fall back to the pinned release binary. `ownership_check_pass.jac`
+declares `REQUIRES = ('cfg', 'inference')`; whatever registers the
+`inference` analysis provider apparently doesn't happen on the
+`JAC_NO_PRECOMPILE=1` dev-source path.
+
+### 13. Release binary + newer compiler source: circular import in rc_facts_pass
+
+Same setup as issue 12 but with source at `main` (cfae4422e, one day newer
+than the binary):
+
+```
+cannot import name 'result_ownership' from partially initialized module
+'jaclang.compiler.passes.main.rc_facts_pass' (most likely due to a
+circular import)
+```
+
+So even if issue 12 were fixed, cross-version dev-source runs hit a real
+import cycle in the ownership/RC pass cluster.
+
 ## Guide gaps (jac guide / SKILL.md)
 
 - `jac-native-memory` shows single-file toys only. It never shows the shape a

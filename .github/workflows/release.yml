@@ -1,0 +1,69 @@
+name: release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+# Same pinned-release toolchain rationale as ci.yml (DOGFOOD.md issues 12/13).
+env:
+  JAC_VERSION: "0.34.7"
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            target: linux-x86_64
+          - os: macos-latest
+            target: macos-arm64
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install jac ${{ env.JAC_VERSION }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          curl -fsSL https://raw.githubusercontent.com/jaseci-labs/jaseci/main/scripts/install.sh \
+            | bash -s -- --version "$JAC_VERSION"
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+          "$HOME/.local/bin/jac" --version
+
+      - name: Gate (check + tests)
+        run: |
+          jac check .
+          jac test main.na.jac
+
+      - name: Headless native build (zero-RC proof)
+        run: jac nacompile main.na.jac --scrub --gc none --enforce-nogc --assert-no-rc -o kimi-fetch
+
+      - name: Smoke the release binary
+        run: |
+          ./kimi-fetch --help
+          mkdir -p smoke/K3/.kimi-fetch
+          cp tests/fixture_manifest.json smoke/K3/.kimi-fetch/manifest.json
+          ./kimi-fetch smoke/K3 --status | grep -q "0 done, 2 pending (300 bytes) of 2 files"
+
+      - name: Package
+        run: |
+          TAG="${GITHUB_REF_NAME}"
+          PKG="kimi-fetch-${TAG}-${{ matrix.target }}"
+          mkdir "$PKG"
+          cp kimi-fetch LICENSE README.md "$PKG/"
+          tar -czf "$PKG.tar.gz" "$PKG"
+          shasum -a 256 "$PKG.tar.gz" > "$PKG.tar.gz.sha256" 2>/dev/null || sha256sum "$PKG.tar.gz" > "$PKG.tar.gz.sha256"
+
+      - name: Upload to the release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="${GITHUB_REF_NAME}"
+          gh release create "$TAG" --repo "$GITHUB_REPOSITORY" --title "$TAG" --generate-notes 2>/dev/null || true
+          gh release upload "$TAG" --repo "$GITHUB_REPOSITORY" --clobber \
+            "kimi-fetch-${TAG}-${{ matrix.target }}.tar.gz" \
+            "kimi-fetch-${TAG}-${{ matrix.target }}.tar.gz.sha256"

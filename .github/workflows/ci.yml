@@ -6,9 +6,18 @@ on:
   pull_request:
   workflow_dispatch:
 
+# CI runs the pinned RELEASE toolchain. Running the compiler from a pinned
+# source checkout (install release binary + `[dev] jaclang_source` stanza)
+# is the intended dev loop, but release binaries currently cannot drive a
+# source tree: the ownership pass dies with a scheduling error, and newer
+# source SHAs additionally hit a circular import in rc_facts_pass — see
+# DOGFOOD.md issues 12 and 13. When those are fixed upstream, restore:
+#   git init "$RUNNER_TEMP/jaseci" && git -C "$RUNNER_TEMP/jaseci" fetch \
+#     --depth 1 https://github.com/jaseci-labs/jaseci.git <SHA> && \
+#     git -C "$RUNNER_TEMP/jaseci" checkout FETCH_HEAD
+#   printf '\n[dev]\njaclang_source = "%s/jaseci/jac"\n' "$RUNNER_TEMP" >> jac.toml
 env:
-  JACLANG_REPO: https://github.com/jaseci-labs/jaseci.git
-  JACLANG_REF: cfae4422eb0cf73d6aa066210c78c5050e320777
+  JAC_VERSION: "0.34.7"
 
 jobs:
   build:
@@ -24,20 +33,14 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install jac
+      - name: Install jac ${{ env.JAC_VERSION }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          curl -fsSL https://raw.githubusercontent.com/jaseci-labs/jaseci/main/scripts/install.sh | bash
+          curl -fsSL https://raw.githubusercontent.com/jaseci-labs/jaseci/main/scripts/install.sh \
+            | bash -s -- --version "$JAC_VERSION"
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
-
-      - name: Wire the pinned dev compiler source
-        run: |
-          git init -q "$RUNNER_TEMP/jaseci"
-          git -C "$RUNNER_TEMP/jaseci" remote add origin "$JACLANG_REPO"
-          git -C "$RUNNER_TEMP/jaseci" fetch -q --depth 1 origin "$JACLANG_REF"
-          git -C "$RUNNER_TEMP/jaseci" checkout -q FETCH_HEAD
-          printf '\n[dev]\njaclang_source = "%s/jaseci/jac"\n' "$RUNNER_TEMP" >> jac.toml
-          jac --version
-          jac --version 2>&1 | grep -q "dev mode"
+          "$HOME/.local/bin/jac" --version
 
       - name: Type-check and ownership-check
         run: jac check .
