@@ -1,0 +1,7 @@
+.jac/
+jac.local.toml
+dist/
+kimi-fetch
+*.part
+Kimi-K3/
+.jac-dev/

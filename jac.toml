@@ -1,0 +1,15 @@
+[project]
+name = "kimi-fetch"
+version = "0.1.0"
+description = "Resumable, file-by-file downloader for the moonshotai/Kimi-K3 Hugging Face repo, built as a zero-RC native binary from borrow-checked Jac"
+entry-point = "main.na.jac"
+kind = "native-binary"
+
+# Every module compiles under the zero-RC ownership contract: no refcounting
+# or collector machinery may survive into the binary (verified in CI with
+# `jac nacompile main.na.jac --gc none --enforce-nogc --assert-no-rc`).
+[gc]
+default = "none"
+
+[gc.enforce]
+modules = ["*"]
