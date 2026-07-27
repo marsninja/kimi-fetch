@@ -312,7 +312,7 @@ impl auth_flag() -> own str {
 
 impl fetch_manifest(state: &str, refresh: bool) -> bool {
     mpath: own str = f"{state}/manifest.json";
-    have = os.path.isfile(f"{mpath}");
+    have = os.path.exists(f"{mpath}");
     if have and not refresh {
         return True;
     }
@@ -368,7 +368,7 @@ impl attempt_one(dest: &str, e: &FileEntry, tmp: &str) -> bool {
     fin: own str = f"{dest}/{e.path}";
     part: own str = f"{fin}.part";
     have = 0;
-    if os.path.isfile(f"{part}") {
+    if os.path.exists(f"{part}") {
         have = file_size(&part, tmp);
     }
     if have > e.size {
@@ -538,7 +538,7 @@ impl run() -> int {
             continue;
         }
         fin: own str = f"{dest}/{e.path}";
-        if os.path.isfile(f"{fin}") {
+        if os.path.exists(f"{fin}") {
             done_before += 1;
             continue;
         }
@@ -546,7 +546,7 @@ impl run() -> int {
             pending += 1;
             pending_bytes += e.size;
             part: own str = f"{fin}.part";
-            if os.path.isfile(f"{part}") {
+            if os.path.exists(f"{part}") {
                 have = file_size(&part, &tmp);
                 print(f"partial  {e.path} ({have}/{e.size} bytes)");
             } else {

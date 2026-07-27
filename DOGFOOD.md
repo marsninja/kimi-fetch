@@ -135,6 +135,23 @@ arguments into one quoted blob and curl reports "no URL specified". This
 tool now assembles every command by concatenating single-interpolation
 pieces through a `qp()` quote helper.
 
+### 11. `os.path.isfile` always returns False on the native path
+
+```jac
+with open("/tmp/y.txt", "w") as f { f.write("hi"); }
+print(os.path.exists("/tmp/y.txt"));   # 1
+print(os.path.isfile("/tmp/y.txt"));   # 0  — wrong, and no compile-time error
+```
+
+`jac-native` lists `isfile` in the supported `os.path` subset, but natively it
+returns False for every input (Python backend returns True for the same
+call). In this tool that silently broke three things at once — the manifest
+cache re-fetched every run, finished files were re-downloaded, and `--status`
+reported "pending" for files with partials on disk. Switched everything to
+`os.path.exists`, which works. Same family as issue 1: the native `os.path`
+shims aren't covered by the fail-loudly guarantee, and two of the four
+"supported" members are broken.
+
 ## Guide gaps (jac guide / SKILL.md)
 
 - `jac-native-memory` shows single-file toys only. It never shows the shape a
